@@ -19,7 +19,6 @@ async def lifespan(app: FastAPI):
     _reader = OCRReader()
     logger.info("OCR engine initialized (backend=%s)", _reader._backend)
     yield
-    global _reader
     _reader = None
 
 
