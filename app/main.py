@@ -1,5 +1,6 @@
 import io
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, UploadFile
@@ -8,6 +9,10 @@ from PIL import Image
 from .ocr_engine import OCRReader
 from .schemas import HealthResponse, OCRResponse
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 _reader: OCRReader | None = None
@@ -46,12 +51,18 @@ async def ocr(
     contents = await image.read()
     img = Image.open(io.BytesIO(contents))
     try:
+        t0 = time.monotonic()
         results = _reader.read_image(
             img,
             region_name=region_name,
             offset=(offset_x, offset_y),
             source=source,
             scene=scene,
+        )
+        elapsed = time.monotonic() - t0
+        logger.info(
+            "OCR region=%s size=%dx%d results=%d elapsed=%.2fs",
+            region_name, img.width, img.height, len(results), elapsed,
         )
     finally:
         img.close()
