@@ -1,0 +1,15 @@
+[Unit]
+Description=OCR Service (FastAPI + RapidOCR)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ocr-service
+ExecStart=/opt/ocr-service/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
