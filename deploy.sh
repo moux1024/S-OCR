@@ -4,6 +4,11 @@ set -euo pipefail
 REPO_URL="git@github.com:moux1024/S-OCR.git"
 DEPLOY_DIR="/opt/ocr-service"
 
+echo "==> Checking NVIDIA GPU / CUDA"
+if ! nvidia-smi &>/dev/null; then
+    echo "WARNING: nvidia-smi not found — GPU acceleration unavailable, will use CPU fallback"
+fi
+
 echo "==> Cloning/updating repository"
 if [ -d "${DEPLOY_DIR}/.git" ]; then
     cd "${DEPLOY_DIR}"

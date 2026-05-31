@@ -1,5 +1,5 @@
 [Unit]
-Description=OCR Service (FastAPI + RapidOCR)
+Description=OCR Service (FastAPI + PaddleOCR GPU)
 After=network.target
 
 [Service]

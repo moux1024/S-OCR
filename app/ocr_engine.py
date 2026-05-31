@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class OCRReader:
-    """OCR wrapper using RapidOCR (onnxruntime) with PaddleOCR fallback."""
+    """OCR wrapper using PaddleOCR (GPU) with RapidOCR (CPU) fallback."""
 
     def __init__(self, enabled: bool = True, model_profile: str = "mobile"):
         self.enabled = enabled
@@ -19,24 +19,24 @@ class OCRReader:
         if not enabled:
             return
         try:
-            from rapidocr_onnxruntime import RapidOCR
+            from paddleocr import PaddleOCR
 
-            self._reader = RapidOCR()
-            self._backend = "rapid"
+            self._reader = self._create_paddle_reader(PaddleOCR)
+            self._backend = "paddle-gpu"
             self.available = True
-            logger.info("OCR backend: rapidocr-onnxruntime")
-        except ImportError:
-            pass
+            logger.info("OCR backend: PaddleOCR (GPU)")
+        except (ImportError, TypeError, ValueError, RuntimeError) as exc:
+            logger.warning("PaddleOCR GPU unavailable: %s, falling back to RapidOCR", exc)
         if not self.available:
             try:
-                from paddleocr import PaddleOCR
+                from rapidocr_onnxruntime import RapidOCR
 
-                self._reader = self._create_paddle_reader(PaddleOCR)
-                self._backend = "paddle"
+                self._reader = RapidOCR()
+                self._backend = "rapid"
                 self.available = True
-                logger.info("OCR backend: PaddleOCR")
-            except (ImportError, TypeError, ValueError, RuntimeError) as exc:
-                logger.warning("OCR unavailable: %s", exc)
+                logger.info("OCR backend: rapidocr-onnxruntime (CPU)")
+            except ImportError:
+                pass
 
     def read_image(
         self,
@@ -70,6 +70,15 @@ class OCRReader:
         if self._backend == "rapid":
             result, _ = self._reader(image_array)
             return _rapid_to_items(result)
+        if self._backend == "paddle-gpu":
+            if hasattr(self._reader, "predict"):
+                return self._reader.predict(
+                    image_array,
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=False,
+                )
+            return self._reader.ocr(image_array, cls=False)
         if hasattr(self._reader, "predict"):
             return self._reader.predict(
                 image_array,
@@ -89,6 +98,8 @@ class OCRReader:
                 "use_doc_unwarping": False,
                 "use_textline_orientation": False,
             }
+            if "use_gpu" in params:
+                kwargs["use_gpu"] = True
             if self.model_profile == "mobile":
                 kwargs.update(
                     {
@@ -99,7 +110,7 @@ class OCRReader:
             else:
                 kwargs["lang"] = "ch"
             return paddle_ocr_cls(**kwargs)
-        return paddle_ocr_cls(use_angle_cls=False, lang="ch")
+        return paddle_ocr_cls(use_angle_cls=False, lang="ch", use_gpu=True)
 
 
 def _rapid_to_items(result):
